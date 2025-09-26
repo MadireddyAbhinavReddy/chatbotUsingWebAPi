@@ -1,0 +1,28 @@
+# Core environment/variables
+python-dotenv
+
+# Web framework
+fastapi
+uvicorn[standard]
+
+# Data models
+pydantic
+
+# Database
+SQLAlchemy
+
+# Vector DB
+chromadb
+
+# Google Generative AI
+google-genai
+
+# Data analysis
+pandas
+
+# OpenAI API
+openai
+
+# Geospatial
+geopandas
+shapely
