@@ -100,23 +100,22 @@ export const useVoiceRecognition = (
       };
 
       recognition.onend = () => {
-        // Only stop if the user explicitly requested it
-        if (shouldStopRef.current) {
-          setIsListening(false);
-          shouldStopRef.current = false;
-        } else {
-          // Auto-restart if it stopped unexpectedly and we're still supposed to be listening
-          if (recognitionRef.current && isListening) {
-            try {
-              setTimeout(() => {
-                if (recognitionRef.current && !shouldStopRef.current) {
-                  recognitionRef.current.start();
-                }
-              }, 100);
-            } catch (err) {
-              console.log('Recognition restart failed:', err);
-              setIsListening(false);
-            }
+        // Always stop when onend is called - no auto-restart
+        setIsListening(false);
+        
+        // Only restart if user hasn't requested to stop AND we want continuous mode
+        if (!shouldStopRef.current && continuous && recognitionRef.current) {
+          try {
+            // Small delay to prevent rapid restart loops
+            setTimeout(() => {
+              if (recognitionRef.current && !shouldStopRef.current) {
+                recognitionRef.current.start();
+                setIsListening(true);
+              }
+            }, 200);
+          } catch (err) {
+            console.log('Recognition restart failed:', err);
+            setIsListening(false);
           }
         }
       };
@@ -131,11 +130,16 @@ export const useVoiceRecognition = (
 
   const stopListening = useCallback(() => {
     shouldStopRef.current = true; // Set flag to indicate user wants to stop
+    setIsListening(false); // Set state immediately
+    
     if (recognitionRef.current) {
-      recognitionRef.current.stop();
+      try {
+        recognitionRef.current.stop();
+      } catch (err) {
+        console.log('Error stopping recognition:', err);
+      }
       recognitionRef.current = null;
     }
-    setIsListening(false);
   }, []);
 
   // Cleanup on unmount

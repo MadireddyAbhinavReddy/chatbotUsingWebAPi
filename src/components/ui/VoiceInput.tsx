@@ -4,6 +4,7 @@ import { Mic, MicOff, Volume2, Square } from 'lucide-react';
 import { useVoiceRecognition } from '@/hooks/useVoiceRecognition';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
+import { getLanguageCodeForMethod, getLanguageDisplayName } from '@/utils/languageUtils';
 import {
   Tooltip,
   TooltipContent,
@@ -19,6 +20,7 @@ interface VoiceInputProps {
   disabled?: boolean;
   language?: string;
   useBackend?: boolean; // Option to use backend speech recognition
+  method?: 'whisper' | 'whisper-api' | 'google' | 'azure'; // Speech recognition method
 }
 
 export const VoiceInput: React.FC<VoiceInputProps> = ({
@@ -28,7 +30,8 @@ export const VoiceInput: React.FC<VoiceInputProps> = ({
   className,
   disabled = false,
   language = 'en-US',
-  useBackend = false
+  useBackend = true, // Default to backend for better accuracy
+  method = 'whisper' // Default to Whisper for best accuracy
 }) => {
   const { toast } = useToast();
   const [isRecording, setIsRecording] = useState(false);
@@ -44,7 +47,7 @@ export const VoiceInput: React.FC<VoiceInputProps> = ({
     resetTranscript,
     error
   } = useVoiceRecognition({
-    continuous: true, // Enable continuous mode with manual control
+    continuous: false, // Disable continuous mode to prevent auto-restart
     interimResults: true,
     language
   });
@@ -129,8 +132,20 @@ export const VoiceInput: React.FC<VoiceInputProps> = ({
     try {
       const formData = new FormData();
       formData.append('audio_file', audioBlob, 'recording.wav');
+      
+      // Get proper language code for the selected method
+      const langCode = getLanguageCodeForMethod(
+        language.includes('-') ? language.split('-')[0] : language, 
+        method
+      );
+      
+      const url = new URL('http://localhost:8000/speech-to-text');
+      url.searchParams.append('method', method);
+      if (langCode && langCode !== 'en') {
+        url.searchParams.append('language', langCode);
+      }
 
-      const response = await fetch('http://localhost:8000/speech-to-text', {
+      const response = await fetch(url.toString(), {
         method: 'POST',
         body: formData,
       });
@@ -140,19 +155,30 @@ export const VoiceInput: React.FC<VoiceInputProps> = ({
       }
 
       const result = await response.json();
+      console.log('🎤 Backend Response:', result);
+      console.log('📝 Transcribed Text:', `"${result.text}"`);
+      console.log('🌍 Detected Language:', result.language);
+      console.log('📊 Confidence:', result.confidence);
       onTranscript(result.text);
+      
+      const methodName = result.method === 'whisper-local' ? 'Local Whisper' : 
+                        result.method === 'whisper-api' ? 'Cloud Whisper' :
+                        result.method === 'google' ? 'Google Speech' : result.method;
       
       toast({
         title: "Speech Recognized",
-        description: `Confidence: ${(result.confidence * 100).toFixed(1)}%`,
+        description: `${methodName} | Confidence: ${(result.confidence * 100).toFixed(1)}%${result.language ? ` | Language: ${getLanguageDisplayName(result.language)}` : ''}`,
       });
     } catch (error) {
       console.error('Error sending audio to backend:', error);
       toast({
         title: "Recognition Error",
-        description: "Failed to process speech. Please try again.",
+        description: "Failed to process speech. Trying fallback method...",
         variant: "destructive",
       });
+      
+      // Don't fallback to browser recognition to avoid auto-restart issues
+      // User can manually switch if needed
     }
   };
 

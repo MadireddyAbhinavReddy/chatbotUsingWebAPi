@@ -787,17 +787,24 @@ function ChatContent({
   const [isVoiceActive, setIsVoiceActive] = useState(false);
 
   const handleVoiceTranscript = (transcript: string) => {
+    console.log('🎤 Voice transcript received:', `"${transcript}"`);
+    console.log('📏 Transcript length:', transcript.length);
+    console.log('🔤 Transcript encoding:', new TextEncoder().encode(transcript));
     setVoiceTranscript(transcript);
-    if (isVoiceActive) {
-      setPrompt(transcript);
-      // Auto-resize the textarea
+    // Always set the prompt when we get a transcript (backend sends it after recording stops)
+    if (transcript && transcript.trim()) {
+      console.log('✅ Setting prompt to:', `"${transcript.trim()}"`);
+      setPrompt(transcript.trim());
+      
+      // Also log what's actually in the textarea after setting
       setTimeout(() => {
-        const textarea = document.querySelector('textarea');
+        const textarea = document.querySelector('textarea') as HTMLTextAreaElement;
         if (textarea) {
+          console.log('📝 Textarea value after setting:', `"${textarea.value}"`);
           textarea.style.height = "auto";
           textarea.style.height = textarea.scrollHeight + "px";
         }
-      }, 0);
+      }, 100);
     }
   };
 
@@ -812,10 +819,7 @@ function ChatContent({
 
   const handleVoiceStop = () => {
     setIsVoiceActive(false);
-    // Keep the final transcript in the prompt
-    if (voiceTranscript.trim()) {
-      setPrompt(voiceTranscript.trim());
-    }
+    // Transcript will be handled by handleVoiceTranscript when it arrives from backend
   };
 
   const handleImageUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -1523,6 +1527,8 @@ function ChatContent({
                       onStop={handleVoiceStop}
                       className="rounded-xl border border-gray-700 hover:bg-gray-700 transition-all duration-300 mb-2"
                       disabled={isLoading}
+                      useBackend={true}
+                      method="whisper"
                       language={selectedLanguage === 'english' ? 'en-US' : 
                                selectedLanguage === 'spanish' ? 'es-ES' :
                                selectedLanguage === 'french' ? 'fr-FR' :
